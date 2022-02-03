@@ -1,0 +1,6 @@
+Prospect_OLY_Forest_Recon,1.0
+Prospect_OLY_Forest_Scan,1.0
+Prospect_OLY_Glacier_Expedition,1.0
+Prospect_OLY_Glacier_Extraction,1.0
+Prospect_OLY_Glacier_Scan,1.0
+Prospect_OLY_RiverLands_Expedition,1.0

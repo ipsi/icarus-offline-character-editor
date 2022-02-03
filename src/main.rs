@@ -15,6 +15,8 @@ use serde::{Deserialize, Serialize};
 
 const TALENTS_RAW: &'static str = include_str!("talents.txt");
 const BLUEPRINTS_RAW: &'static str = include_str!("blueprints.txt");
+const PROSPECTS_RAW: &'static str = include_str!("prospects.txt");
+const WORKSHOP_ITEMS_RAW: &'static str = include_str!("workshop_items.txt");
 
 const EXOTIC_MINING_FLAG: f64 = 17.0;
 const EXOTIC_EXTRACTION_FLAG: f64 = 565.0;
@@ -23,6 +25,8 @@ lazy_static! {
     static ref TALENT_LEVELS: HashMap<&'static str, f64> = build_map(TALENTS_RAW);
     static ref TALENTS: HashSet<&'static str> = build_set(TALENTS_RAW);
     static ref BLUEPRINTS: HashSet<&'static str> = build_set(BLUEPRINTS_RAW);
+    static ref PROSPECTS: HashSet<&'static str> = build_set(PROSPECTS_RAW);
+    static ref WORKSHOP_ITEMS: HashSet<&'static str> = build_set(WORKSHOP_ITEMS_RAW);
 }
 
 fn build_map(str: &'static str) -> HashMap<&'static str, f64> {
@@ -44,16 +48,16 @@ fn build_map(str: &'static str) -> HashMap<&'static str, f64> {
 }
 
 fn build_set(str: &'static str) -> HashSet<&'static str> {
-    let mut map = HashSet::<&'static str>::new();
+    let mut set = HashSet::<&'static str>::new();
     for line in str.split("\n").into_iter() {
         let parts = line.split(",").collect::<Vec<&'static str>>();
         if parts.len() != 2 {
             panic!("Unable to parse file - expected [{}] to split into 2, but got [{:?}] instead", line, parts);
         }
         let talent_name = parts[0];
-        map.insert(talent_name);
+        set.insert(talent_name);
     }
-    map
+    set
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, Debug, Data, Lens)]
@@ -148,6 +152,22 @@ struct Profile {
     pub talents: Vector<Talent>,
 }
 
+impl Profile {
+    fn unlock_all_prospects(&mut self) {
+        self.talents.retain(|t| !PROSPECTS.contains(t.row_name.as_str()));
+        for t in PROSPECTS.iter() {
+            self.talents.push_back(Talent{row_name: (*t).to_owned(), rank: 1.0 })
+        }
+    }
+
+    fn unlock_all_workshop_items(&mut self) {
+        self.talents.retain(|t| !WORKSHOP_ITEMS.contains(t.row_name.as_str()));
+        for t in WORKSHOP_ITEMS.iter() {
+            self.talents.push_back(Talent{row_name: (*t).to_owned(), rank: 1.0 })
+        }
+    }
+}
+
 struct Credit();
 
 impl Lens<Vector<MetaResources>, MetaResources> for Credit {
@@ -179,7 +199,7 @@ impl Lens<Vector<MetaResources>, MetaResources> for Exotic {
         if let Some(exotics) = data.iter().find(|x| x.meta_row == "Exotic1") {
             f(exotics)
         } else {
-            unimplemented!()
+             f(&MetaResources{ meta_row: "".to_string(), count: 0.0 })
         }
     }
 
@@ -188,53 +208,13 @@ impl Lens<Vector<MetaResources>, MetaResources> for Exotic {
             f(exotics)
         } else {
             data.push_back(MetaResources {
-                meta_row: "Credits".to_string(),
+                meta_row: "Exotic1".to_string(),
                 count: 0.0,
             });
             f(data.back_mut().expect("Cannot be empty as we just pushed an object into the vec..."))
         }
     }
 }
-
-// struct ExoticMiningFlag{}
-//
-// impl Lens<Vector<f64>, bool> for ExoticMiningFlag {
-//     fn with<V, F: FnOnce(&bool) -> V>(&self, data: &Vector<f64>, f: F) -> V {
-//         f(&data.contains(&EXOTIC_MINING_FLAG))
-//     }
-//
-//     fn with_mut<V, F: FnOnce(&mut bool) -> V>(&self, data: &mut Vector<f64>, f: F) -> V {
-//         let mut flag = data.contains(&EXOTIC_MINING_FLAG);
-//         let v = f(&mut flag);
-//         if flag {
-//             if !data.contains(&EXOTIC_MINING_FLAG) { data.push_back(EXOTIC_MINING_FLAG) };
-//         } else {
-//             data.retain(|x| *x != EXOTIC_MINING_FLAG);
-//         }
-//
-//         v
-//     }
-// }
-//
-// struct ExoticExtractionFlag{}
-//
-// impl Lens<Vector<f64>, bool> for ExoticExtractionFlag {
-//     fn with<V, F: FnOnce(&bool) -> V>(&self, data: &Vector<f64>, f: F) -> V {
-//         f(&data.contains(&EXOTIC_EXTRACTION_FLAG))
-//     }
-//
-//     fn with_mut<V, F: FnOnce(&mut bool) -> V>(&self, data: &mut Vector<f64>, f: F) -> V {
-//         let mut flag = data.contains(&EXOTIC_EXTRACTION_FLAG);
-//         let v = f(&mut flag);
-//         if flag {
-//             if !data.contains(&EXOTIC_EXTRACTION_FLAG) { data.push_back(EXOTIC_EXTRACTION_FLAG) };
-//         } else {
-//             data.retain(|x| *x != EXOTIC_EXTRACTION_FLAG);
-//         }
-//
-//         v
-//     }
-// }
 
 struct FlagLens {
     flag: f64,
@@ -292,10 +272,6 @@ impl Character {
 
     fn clear_xp_debt(&mut self) {
         self.xp_debt = 0.0;
-    }
-
-    fn unlock_all_prospects(&mut self) {
-
     }
 
 }
@@ -534,6 +510,14 @@ fn ui_builder() -> impl Widget<UiState> {
         .with_child(Flex::row().with_child(label_credits).with_default_spacer().with_child(textbox_credits))
         .with_default_spacer()
         .with_child(Flex::row().with_child(label_exotics).with_default_spacer().with_child(textbox_exotics))
+        .with_default_spacer()
+        .with_child(Flex::row()
+            .with_child(Button::new("Unlock All Prospects").on_click(|_ctx, t: &mut Profile, _env| t.unlock_all_prospects()).lens(UiState::profile_lens))
+        )
+        .with_default_spacer()
+        .with_child(Flex::row()
+            .with_child(Button::new("Unlock All Workshop Items").on_click(|_ctx, t: &mut Profile, _env| t.unlock_all_workshop_items()).lens(UiState::profile_lens))
+        )
         .with_default_spacer()
         .with_flex_child(tabs, 1.0);
     Align::centered(layout)
