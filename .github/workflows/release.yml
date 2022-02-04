@@ -16,7 +16,7 @@ jobs:
       matrix:
         include:
           - build: windows
-            os: windows-latest
+            os: ubuntu-latest
             rust: stable
             target: x86_64-pc-windows-gnu
             cross: true
@@ -34,7 +34,7 @@ jobs:
             ~/.cargo/git
             ~/.rustup
             target
-          key: ${{ runner.os }}-${{ matrix.rust }}
+          key: ${{ runner.target }}-${{ matrix.rust }}
       - uses: actions-rs/toolchain@v1
         name: Set Toolchain
         with:
