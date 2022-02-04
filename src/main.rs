@@ -6,10 +6,10 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use directories::BaseDirs;
-use druid::{AppDelegate, AppLauncher, Command, Data, DelegateCtx, Env, Event, Handled, Lens, LensExt, Target, Widget, WidgetExt, WindowDesc, WindowId};
+use druid::{AppLauncher, Data, Env, Lens, LensExt, Widget, WidgetExt, WindowDesc};
 use druid::im::vector::Vector;
 use druid::text::ParseFormatter;
-use druid::widget::{Align, Button, Checkbox, CrossAxisAlignment, Flex, Label, LabelText, TabInfo, Tabs, TabsPolicy, TextBox, ValueTextBox};
+use druid::widget::{Align, Button, Checkbox, CrossAxisAlignment, Flex, Label, LabelText, TabInfo, Tabs, TabsPolicy, TextBox, ValueTextBox, ViewSwitcher};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 
@@ -265,43 +265,65 @@ impl Character {
         }
     }
 
-    fn resurrect(&mut self) {
-        self.is_abandoned = false;
-        self.is_dead = false;
-    }
-
-    fn clear_xp_debt(&mut self) {
-        self.xp_debt = 0.0;
-    }
+    // fn resurrect(&mut self) {
+    //     self.is_abandoned = false;
+    //     self.is_dead = false;
+    // }
+    //
+    // fn clear_xp_debt(&mut self) {
+    //     self.xp_debt = 0.0;
+    // }
 
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
     let main_window = WindowDesc::new(ui_builder()).title("Icarus Offline Character Editor").window_size((440.0, 600.0));
-    let data = UiState::new()?;
-
-    AppLauncher::with_window(main_window)
-        .log_to_console()
-        .delegate(TestAppHandler {})
-        .launch(data)?;
+    let data = UiState::new();
+    match data {
+        Ok(d) => AppLauncher::with_window(main_window)
+            .log_to_console()
+            // .delegate(TestAppHandler {})
+            .launch(d)?,
+        Err(e) => AppLauncher::with_window(main_window)
+            .log_to_console()
+            // .delegate(TestAppHandler {})
+            .launch(UiState {
+                profile_file: Default::default(),
+                profile: Profile {
+                    user_id: "".to_string(),
+                    meta_resources: Default::default(),
+                    unlocked_flags: Default::default(),
+                    talents: Default::default()
+                },
+                characters_file: Default::default(),
+                characters: Default::default(),
+                error: Some(format!("Error: {}", e)),
+            })?,
+    }
 
     Ok(())
 }
 
-struct TestAppHandler {
+// struct TestAppHandler {
+//
+// }
 
-}
+// impl AppDelegate<UiState> for TestAppHandler {
+//     fn event(&mut self, ctx: &mut DelegateCtx, window_id: WindowId, event: Event, data: &mut UiState, env: &Env) -> Option<Event> {
+//         // println!("Received Event: {:?}", event);
+//         Some(event)
+//     }
+//
+//     fn command(&mut self, ctx: &mut DelegateCtx, target: Target, cmd: &Command, data: &mut UiState, env: &Env) -> Handled {
+//         // println!("Received command: {:?}", cmd);
+//         Handled::No
+//     }
+// }
 
-impl AppDelegate<UiState> for TestAppHandler {
-    fn event(&mut self, ctx: &mut DelegateCtx, window_id: WindowId, event: Event, data: &mut UiState, env: &Env) -> Option<Event> {
-        // println!("Received Event: {:?}", event);
-        Some(event)
-    }
-
-    fn command(&mut self, ctx: &mut DelegateCtx, target: Target, cmd: &Command, data: &mut UiState, env: &Env) -> Handled {
-        // println!("Received command: {:?}", cmd);
-        Handled::No
-    }
+#[derive(Clone, Data, PartialEq)]
+enum MainView {
+    Error,
+    Data,
 }
 
 #[derive(Clone, Data, Lens)]
@@ -316,6 +338,8 @@ struct UiState {
     characters_file: PathBuf,
     #[lens(name = "characters_lens")]
     characters: Vector<Character>,
+    #[lens(name = "error_lens")]
+    error: Option<String>,
 }
 
 impl UiState {
@@ -360,6 +384,7 @@ impl UiState {
             profile,
             characters_file,
             characters: Vector::from(characters),
+            error: None,
         };
 
         Ok(data)
@@ -456,11 +481,11 @@ impl TabsPolicy for CharTabs {
                 .with_child(Label::new("Abandoned"))
                 .with_default_spacer()
                 .with_child(Checkbox::new("")
-                    .disabled_if(|state: &bool, ctx| !*state)
+                    .disabled_if(|state: &bool, _ctx| !*state)
                     .lens(character_lens.clone().then(Character::is_abandoned)))
                 .with_child(Button::new("Restore Character")
-                    .on_click(|ctx, t: &mut Character, env|{ println!("Restoring character!") })
-                    .disabled_if(|state: &Character, ctx| !state.is_abandoned)
+                    .on_click(|_ctx, _t: &mut Character, _env|{ println!("Restoring character!") })
+                    .disabled_if(|state: &Character, _ctx| !state.is_abandoned)
                     .lens(character_lens.clone()))
             ).with_default_spacer()
             .with_child(Flex::row()
@@ -484,11 +509,6 @@ impl TabsPolicy for CharTabs {
             .with_child(Flex::row()
                 .with_child(Button::new("Save").on_click(|_ctx, t: &mut UiState, _env| t.save().expect("Error saving profile and/or character data") ))
             )
-
-            // .with_child(Flex::row().with_child(Label::new("unlocked_flags")).with_default_spacer().with_child(TextBox::new().lens(character_lens.clone().then(Character::unlocked_flags)))).with_default_spacer()
-            // .with_child(Flex::row().with_child(Label::new("meta_resources")).with_default_spacer().with_child(TextBox::new().lens(character_lens.clone().then(Character::meta_resources)))).with_default_spacer()
-            // .with_child(Flex::row().with_child(Label::new("cosmetics")).with_default_spacer().with_child(TextBox::new().lens(character_lens.clone().then(Character::cosmetics)))).with_default_spacer()
-            // .with_child(Flex::row().with_child(Label::new("talents")).with_default_spacer().with_child(TextBox::new().lens(character_lens.clone().then(Character::talents)))).with_default_spacer()
     }
 
     fn tab_label(&self, _: Self::Key, info: TabInfo<Self::Input>, _: &Self::Input) -> Self::LabelWidget {
@@ -497,28 +517,44 @@ impl TabsPolicy for CharTabs {
 }
 
 fn ui_builder() -> impl Widget<UiState> {
-    let label_credits = Label::<UiState>::new("Credits: ");
-    let textbox_credits = ValueTextBox::new(TextBox::new(), ParseFormatter::<f64>::new())
-        .fix_width(100.0)
-        .lens(UiState::profile_lens.then(Profile::meta_resources).then(Credit()).then(MetaResources::count));
-    let label_exotics = Label::<UiState>::new("Exotics: ");
-    let textbox_exotics = ValueTextBox::new(TextBox::new(), ParseFormatter::<f64>::new())
-        .fix_width(100.0)
-        .lens(UiState::profile_lens.then(Profile::meta_resources).then(Exotic()).then(MetaResources::count));
-    let tabs = Tabs::for_policy(CharTabs{})/*.lens(UiState)*/;
-    let layout = Flex::column()
-        .with_child(Flex::row().with_child(label_credits).with_default_spacer().with_child(textbox_credits))
-        .with_default_spacer()
-        .with_child(Flex::row().with_child(label_exotics).with_default_spacer().with_child(textbox_exotics))
-        .with_default_spacer()
-        .with_child(Flex::row()
-            .with_child(Button::new("Unlock All Prospects").on_click(|_ctx, t: &mut Profile, _env| t.unlock_all_prospects()).lens(UiState::profile_lens))
-        )
-        .with_default_spacer()
-        .with_child(Flex::row()
-            .with_child(Button::new("Unlock All Workshop Items").on_click(|_ctx, t: &mut Profile, _env| t.unlock_all_workshop_items()).lens(UiState::profile_lens))
-        )
-        .with_default_spacer()
-        .with_flex_child(tabs, 1.0);
-    Align::centered(layout)
+    let view_switcher = ViewSwitcher::new(
+        |data: &UiState, _env| { if data.error.is_some() { MainView::Error } else { MainView::Data }},
+        |selector, data: &UiState, _env| {
+            Box::new(match selector {
+                MainView::Data => {
+                    let label_credits = Label::<UiState>::new("Credits: ");
+                    let textbox_credits = ValueTextBox::new(TextBox::new(), ParseFormatter::<f64>::new())
+                        .fix_width(100.0)
+                        .lens(UiState::profile_lens.then(Profile::meta_resources).then(Credit()).then(MetaResources::count));
+                    let label_exotics = Label::<UiState>::new("Exotics: ");
+                    let textbox_exotics = ValueTextBox::new(TextBox::new(), ParseFormatter::<f64>::new())
+                        .fix_width(100.0)
+                        .lens(UiState::profile_lens.then(Profile::meta_resources).then(Exotic()).then(MetaResources::count));
+                    let tabs = Tabs::for_policy(CharTabs{})/*.lens(UiState)*/;
+                    let layout = Flex::column()
+                        .with_child(Flex::row().with_child(label_credits).with_default_spacer().with_child(textbox_credits))
+                        .with_default_spacer()
+                        .with_child(Flex::row().with_child(label_exotics).with_default_spacer().with_child(textbox_exotics))
+                        .with_default_spacer()
+                        .with_child(Flex::row()
+                            .with_child(Button::new("Unlock All Prospects").on_click(|_ctx, t: &mut Profile, _env| t.unlock_all_prospects()).lens(UiState::profile_lens))
+                        )
+                        .with_default_spacer()
+                        .with_child(Flex::row()
+                            .with_child(Button::new("Unlock All Workshop Items").on_click(|_ctx, t: &mut Profile, _env| t.unlock_all_workshop_items()).lens(UiState::profile_lens))
+                        )
+                        .with_default_spacer()
+                        .with_child(Flex::row()
+                            .with_child(Button::new("Save").on_click(|_ctx, t: &mut UiState, _env| t.save().expect("Error saving data")))
+                        )
+                        .with_default_spacer()
+                        .with_flex_child(tabs, 1.0);
+                    Align::centered(layout)
+                },
+                MainView::Error => Align::centered(Label::new(format!("Error occurred during startup: {}", data.error.as_ref().unwrap_or(&"Unknown Error".to_string())))),
+            })
+        }
+    );
+
+    view_switcher
 }
