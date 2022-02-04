@@ -38,9 +38,11 @@ jobs:
         name: Build
         with:
           command: build
-          args: --verbose
+          args: --verbose --target=x86_64-pc-windows-gnu
+          cross: true
       - uses: actions-rs/cargo@v1
         name: Test
         with:
           command: test
-          args: --verbose
+          args: --verbose --target=x86_64-pc-windows-gnu
+          cross: true
