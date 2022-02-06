@@ -13,13 +13,17 @@ use druid::widget::{Align, Button, Checkbox, CrossAxisAlignment, Flex, Label, La
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 
+const DEFAULT_INVENTORY: &'static str = "{
+    \"ID\": \"MetaInventoryID_Main\",
+    \"Delta\": []
+}";
 const TALENTS_RAW: &'static str = include_str!("talents.txt");
 const BLUEPRINTS_RAW: &'static str = include_str!("blueprints.txt");
 const PROSPECTS_RAW: &'static str = include_str!("prospects.txt");
 const WORKSHOP_ITEMS_RAW: &'static str = include_str!("workshop_items.txt");
 
 const EXOTIC_MINING_FLAG: f64 = 17.0;
-const EXOTIC_EXTRACTION_FLAG: f64 = 565.0;
+const EXOTIC_EXTRACTION_FLAG: f64 = 18.0;
 
 lazy_static! {
     static ref TALENT_LEVELS: HashMap<&'static str, f64> = build_map(TALENTS_RAW);
@@ -92,6 +96,12 @@ struct Character {
     pub cosmetics: Cosmetics,
     #[serde(rename = "Talents")]
     pub talents: Vector<Talent>,
+    #[data(eq)]
+    #[serde(skip)]
+    inventory_path: PathBuf,
+    #[data(eq)]
+    #[serde(skip)]
+    loadout_path: PathBuf,
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, Debug, Data, Lens)]
@@ -240,7 +250,7 @@ impl Lens<Vector<f64>, bool> for FlagLens {
 
 impl Character {
     fn level_to_max(&mut self) {
-        self.xp = 9_999_999.0;
+        self.xp = 99_999_999.0;
     }
 
     fn reset_talents(&mut self) {
@@ -265,60 +275,44 @@ impl Character {
         }
     }
 
-    // fn resurrect(&mut self) {
-    //     self.is_abandoned = false;
-    //     self.is_dead = false;
-    // }
-    //
-    // fn clear_xp_debt(&mut self) {
-    //     self.xp_debt = 0.0;
-    // }
+    fn restore(&mut self) -> Result<(), Box<dyn Error>> {
+        self.is_abandoned = false;
+        self.is_dead = false;
 
-}
+        self.update_inventory()?;
+        self.update_loadout()?;
 
-fn main() -> Result<(), Box<dyn Error>> {
-    let main_window = WindowDesc::new(ui_builder()).title("Icarus Offline Character Editor").window_size((440.0, 600.0));
-    let data = UiState::new();
-    match data {
-        Ok(d) => AppLauncher::with_window(main_window)
-            .log_to_console()
-            // .delegate(TestAppHandler {})
-            .launch(d)?,
-        Err(e) => AppLauncher::with_window(main_window)
-            .log_to_console()
-            // .delegate(TestAppHandler {})
-            .launch(UiState {
-                profile_file: Default::default(),
-                profile: Profile {
-                    user_id: "".to_string(),
-                    meta_resources: Default::default(),
-                    unlocked_flags: Default::default(),
-                    talents: Default::default()
-                },
-                characters_file: Default::default(),
-                characters: Default::default(),
-                error: Some(format!("Error: {}", e)),
-            })?,
+        Ok(())
     }
 
-    Ok(())
+    fn update_loadout(&self) -> Result<(), Box<dyn Error>> {
+        let mut file_io = OpenOptions::new().write(true).read(true).open(self.loadout_path.clone())?;
+        let mut file_contents = String::new();
+        file_io.read_to_string(&mut file_contents)?;
+
+        let mut key_values: HashMap<String, serde_json::Value> = serde_json::from_str(&file_contents)?;
+        key_values.insert("Valid".to_string(), serde_json::Value::Bool(true));
+        file_contents = serde_json::to_string(&key_values)?;
+        let file_contents_raw = file_contents.as_bytes();
+        file_io.set_len(file_contents_raw.len() as u64)?;
+        file_io.write_all(file_contents_raw)?;
+        file_io.flush()?;
+
+        Ok(())
+    }
+
+    fn update_inventory(&self) -> Result<(), Box<dyn Error>> {
+        let mut file_io = OpenOptions::new().write(true).open(self.inventory_path.clone())?;
+
+        let file_contents_raw = DEFAULT_INVENTORY.as_bytes();
+        file_io.set_len(file_contents_raw.len() as u64)?;
+        file_io.write_all(file_contents_raw)?;
+        file_io.flush()?;
+
+        Ok(())
+    }
+
 }
-
-// struct TestAppHandler {
-//
-// }
-
-// impl AppDelegate<UiState> for TestAppHandler {
-//     fn event(&mut self, ctx: &mut DelegateCtx, window_id: WindowId, event: Event, data: &mut UiState, env: &Env) -> Option<Event> {
-//         // println!("Received Event: {:?}", event);
-//         Some(event)
-//     }
-//
-//     fn command(&mut self, ctx: &mut DelegateCtx, target: Target, cmd: &Command, data: &mut UiState, env: &Env) -> Handled {
-//         // println!("Received command: {:?}", cmd);
-//         Handled::No
-//     }
-// }
 
 #[derive(Clone, Data, PartialEq)]
 enum MainView {
@@ -369,7 +363,9 @@ impl UiState {
         let chars: Characters = serde_json::from_str(&character_string)?;
         let mut characters = Vec::<Character>::with_capacity(chars.characters_json.len());
         for c in chars.characters_json {
-            let character: Character = serde_json::from_str(&c)?;
+            let mut character: Character = serde_json::from_str(&c)?;
+            character.inventory_path = data_local_dir.join("Inventory").join(format!("InventoryID_{}.json", character.character_slot as i8));
+            character.loadout_path = data_local_dir.join("Loadout").join(format!("Slot_{}.json", character.character_slot as i8));
             characters.push(character);
         }
         characters.sort_by(|a, b|{
@@ -427,7 +423,6 @@ struct CharTabs {
 impl TabsPolicy for CharTabs {
     type Key = usize;
     type Input = UiState;
-    // type BodyWidget = Flex<UiState>;
     type BodyWidget = Flex<UiState>;
     type LabelWidget = Label<UiState>;
     type Build = ();
@@ -484,7 +479,7 @@ impl TabsPolicy for CharTabs {
                     .disabled_if(|state: &bool, _ctx| !*state)
                     .lens(character_lens.clone().then(Character::is_abandoned)))
                 .with_child(Button::new("Restore Character")
-                    .on_click(|_ctx, _t: &mut Character, _env|{ println!("Restoring character!") })
+                    .on_click(|_ctx, t: &mut Character, _env|{ t.restore().expect("Restoring character failed unexpectedly") })
                     .disabled_if(|state: &Character, _ctx| !state.is_abandoned)
                     .lens(character_lens.clone()))
             ).with_default_spacer()
@@ -557,4 +552,30 @@ fn ui_builder() -> impl Widget<UiState> {
     );
 
     view_switcher
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let main_window = WindowDesc::new(ui_builder()).title("Icarus Offline Character Editor").window_size((440.0, 600.0));
+    let data = UiState::new();
+    match data {
+        Ok(d) => AppLauncher::with_window(main_window)
+            .log_to_console()
+            .launch(d)?,
+        Err(e) => AppLauncher::with_window(main_window)
+            .log_to_console()
+            .launch(UiState {
+                profile_file: Default::default(),
+                profile: Profile {
+                    user_id: "".to_string(),
+                    meta_resources: Default::default(),
+                    unlocked_flags: Default::default(),
+                    talents: Default::default()
+                },
+                characters_file: Default::default(),
+                characters: Default::default(),
+                error: Some(format!("Error: {}", e)),
+            })?,
+    }
+
+    Ok(())
 }
