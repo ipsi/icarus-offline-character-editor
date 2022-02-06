@@ -99,7 +99,7 @@ jobs:
           RELEASE_VERSION=${GITHUB_REF#refs/tags/}
           ASSET_NAME="icarus-offline-character-editor-$RELEASE_VERSION-nocheats.tar.gz"
           MIN_ASSET_PATH="$src/$ASSET_NAME"
-          MIN_CHECKSUM_PATH="MIN_ASSET_PATH.sha256"
+          MIN_CHECKSUM_PATH="$MIN_ASSET_PATH.sha256"
           echo "MIN_ASSET_PATH=$MIN_ASSET_PATH" >> $GITHUB_ENV
           echo "MIN_CHECKSUM_PATH=$MIN_CHECKSUM_PATH" >> $GITHUB_ENV
           tar czf $MIN_ASSET_PATH *
