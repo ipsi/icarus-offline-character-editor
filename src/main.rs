@@ -22,6 +22,9 @@ const BLUEPRINTS_RAW: &'static str = include_str!("blueprints.txt");
 const PROSPECTS_RAW: &'static str = include_str!("prospects.txt");
 const WORKSHOP_ITEMS_RAW: &'static str = include_str!("workshop_items.txt");
 
+const META_RESOURCE_CREDITS: &'static str = "Credits";
+const META_RESOURCE_EXOTICS: &'static str = "Exotic1";
+
 const EXOTIC_MINING_FLAG: f64 = 17.0;
 const EXOTIC_EXTRACTION_FLAG: f64 = 18.0;
 
@@ -178,47 +181,25 @@ impl Profile {
     }
 }
 
-struct Credit();
-
-impl Lens<Vector<MetaResources>, MetaResources> for Credit {
-    fn with<V, F: FnOnce(&MetaResources) -> V>(&self, data: &Vector<MetaResources>, f: F) -> V {
-        if let Some(credits) = data.iter().find(|x| x.meta_row == "Credits") {
-            f(credits)
-        } else {
-            unimplemented!()
-        }
-    }
-
-    fn with_mut<V, F: FnOnce(&mut MetaResources) -> V>(&self, data: &mut Vector<MetaResources>, f: F) -> V {
-        if let Some(credits) = data.iter_mut().find(|x| x.meta_row == "Credits") {
-            f(credits)
-        } else {
-            data.push_back(MetaResources {
-                meta_row: "Credits".to_string(),
-                count: 0.0,
-            });
-            f(data.back_mut().expect("Cannot be empty as we just pushed an object into the vec..."))
-        }
-    }
+struct MetaResourceLens {
+    resource_name: String,
 }
 
-struct Exotic();
-
-impl Lens<Vector<MetaResources>, MetaResources> for Exotic {
+impl Lens<Vector<MetaResources>, MetaResources> for MetaResourceLens {
     fn with<V, F: FnOnce(&MetaResources) -> V>(&self, data: &Vector<MetaResources>, f: F) -> V {
-        if let Some(exotics) = data.iter().find(|x| x.meta_row == "Exotic1") {
-            f(exotics)
+        if let Some(resource) = data.iter().find(|x| x.meta_row == self.resource_name) {
+            f(resource)
         } else {
-             f(&MetaResources{ meta_row: "".to_string(), count: 0.0 })
+            f(&MetaResources{ meta_row: self.resource_name.to_string(), count: 0.0 })
         }
     }
 
     fn with_mut<V, F: FnOnce(&mut MetaResources) -> V>(&self, data: &mut Vector<MetaResources>, f: F) -> V {
-        if let Some(exotics) = data.iter_mut().find(|x| x.meta_row == "Exotic1") {
-            f(exotics)
+        if let Some(resource) = data.iter_mut().find(|x| x.meta_row == self.resource_name) {
+            f(resource)
         } else {
             data.push_back(MetaResources {
-                meta_row: "Exotic1".to_string(),
+                meta_row: self.resource_name.clone(),
                 count: 0.0,
             });
             f(data.back_mut().expect("Cannot be empty as we just pushed an object into the vec..."))
@@ -520,11 +501,11 @@ fn ui_builder() -> impl Widget<UiState> {
                     let label_credits = Label::<UiState>::new("Credits: ");
                     let textbox_credits = ValueTextBox::new(TextBox::new(), ParseFormatter::<f64>::new())
                         .fix_width(100.0)
-                        .lens(UiState::profile_lens.then(Profile::meta_resources).then(Credit()).then(MetaResources::count));
+                        .lens(UiState::profile_lens.then(Profile::meta_resources).then(MetaResourceLens { resource_name: META_RESOURCE_CREDITS.to_string() }).then(MetaResources::count));
                     let label_exotics = Label::<UiState>::new("Exotics: ");
                     let textbox_exotics = ValueTextBox::new(TextBox::new(), ParseFormatter::<f64>::new())
                         .fix_width(100.0)
-                        .lens(UiState::profile_lens.then(Profile::meta_resources).then(Exotic()).then(MetaResources::count));
+                        .lens(UiState::profile_lens.then(Profile::meta_resources).then(MetaResourceLens { resource_name: META_RESOURCE_EXOTICS.to_string() }).then(MetaResources::count));
                     let tabs = Tabs::for_policy(CharTabs{})/*.lens(UiState)*/;
                     let layout = Flex::column()
                         .with_child(Flex::row().with_child(label_credits).with_default_spacer().with_child(textbox_credits))
