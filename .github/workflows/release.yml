@@ -39,13 +39,13 @@ jobs:
         name: Set Toolchain
         with:
           toolchain: ${{matrix.rust}}
-      - name: Build
+      - name: Build - Full
         uses: actions-rs/cargo@v1
         with:
           command: build
           args: --release --target=${{ matrix.target }}
           use-cross: ${{ matrix.cross }}
-      - name: Package Artifacts
+      - name: Package Artifacts - Full
         run: |
           src=$(pwd)
           stage=
@@ -60,7 +60,7 @@ jobs:
           cp target/${{ matrix.target }}/release/icarus-offline-character-editor.exe $stage/
           cd $stage
           RELEASE_VERSION=${GITHUB_REF#refs/tags/}
-          ASSET_NAME="icarus-offline-character-editor-$RELEASE_VERSION-${{ matrix.target }}.tar.gz"
+          ASSET_NAME="icarus-offline-character-editor-$RELEASE_VERSION-full.tar.gz"
           ASSET_PATH="$src/$ASSET_NAME"
           CHECKSUM_PATH="$ASSET_PATH.sha256"
           echo "ASSET_PATH=$ASSET_PATH" >> $GITHUB_ENV
@@ -75,6 +75,43 @@ jobs:
                   shasum -a 256 $ASSET_NAME > $CHECKSUM_PATH
                   ;;
           esac
+
+      - name: Build - Minimal
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --target=${{ matrix.target }} --features minimal --no-default-features
+          use-cross: ${{ matrix.cross }}
+      - name: Package Artifacts - Minimal
+        run: |
+          src=$(pwd)
+          stage=
+          case $RUNNER_OS in
+              Linux)
+                  stage=$(mktemp -d)
+                  ;;
+              macOS)
+                  stage=$(mktemp -d -t tmp)
+                  ;;
+          esac
+          cp target/${{ matrix.target }}/release/icarus-offline-character-editor.exe $stage/
+          cd $stage
+          RELEASE_VERSION=${GITHUB_REF#refs/tags/}
+          ASSET_NAME="icarus-offline-character-editor-$RELEASE_VERSION-nocheats.tar.gz"
+          MIN_ASSET_PATH="$src/$ASSET_NAME"
+          MIN_CHECKSUM_PATH="MIN_ASSET_PATH.sha256"
+          echo "MIN_ASSET_PATH=$MIN_ASSET_PATH" >> $GITHUB_ENV
+          echo "MIN_CHECKSUM_PATH=$MIN_CHECKSUM_PATH" >> $GITHUB_ENV
+          tar czf $MIN_ASSET_PATH *
+          cd $src
+          case $RUNNER_OS in
+              Linux)
+                  sha256sum $ASSET_NAME > $MIN_CHECKSUM_PATH
+                  ;;
+              macOS)
+                  shasum -a 256 $ASSET_NAME > $MIN_CHECKSUM_PATH
+                  ;;
+          esac
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
@@ -82,5 +119,7 @@ jobs:
           files: |
             ${{ env.ASSET_PATH }}
             ${{ env.CHECKSUM_PATH }}
+            ${{ env.MIN_ASSET_PATH }}
+            ${{ env.MIN_CHECKSUM_PATH }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

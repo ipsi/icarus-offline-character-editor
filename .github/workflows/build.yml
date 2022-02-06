@@ -35,14 +35,26 @@ jobs:
         with:
           toolchain: ${{ matrix.rust-toolchain }}
       - uses: actions-rs/cargo@v1
-        name: Build
+        name: Build - Full
         with:
           command: build
           args: --verbose --target=x86_64-pc-windows-gnu
           use-cross: true
       - uses: actions-rs/cargo@v1
-        name: Test
+        name: Test - Full
         with:
           command: test
           args: --verbose --target=x86_64-pc-windows-gnu
+          use-cross: true
+      - uses: actions-rs/cargo@v1
+        name: Build - Minimal
+        with:
+          command: build
+          args: --verbose --target=x86_64-pc-windows-gnu --features minimal --no-default-features
+          use-cross: true
+      - uses: actions-rs/cargo@v1
+        name: Test - Minimal
+        with:
+          command: test
+          args: --verbose --target=x86_64-pc-windows-gnu --features minimal --no-default-features
           use-cross: true

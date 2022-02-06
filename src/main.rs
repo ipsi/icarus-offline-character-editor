@@ -1,3 +1,6 @@
+// On Windows platform, don't show a console when opening the app.
+#![windows_subsystem = "windows"]
+
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs::OpenOptions;
@@ -426,6 +429,7 @@ impl TabsPolicy for CharTabs {
         )
     }
 
+    #[cfg(feature = "full")]
     fn tab_body(&self, key: Self::Key, data: &Self::Input) -> Self::BodyWidget {
         println!("Loading tab body for key {}", key);
         let idx = data.characters.index_of(data.characters.iter().find(|x| x.character_slot as usize == key).expect("not possible")).expect("not possible");
@@ -487,11 +491,45 @@ impl TabsPolicy for CharTabs {
             )
     }
 
+    #[cfg(feature = "minimal")]
+    fn tab_body(&self, key: Self::Key, data: &Self::Input) -> Self::BodyWidget {
+        println!("Loading tab body for key {}", key);
+        let idx = data.characters.index_of(data.characters.iter().find(|x| x.character_slot as usize == key).expect("not possible")).expect("not possible");
+        println!("Found idx {}", idx);
+        let character_lens = UiState::characters_lens.index(idx);
+        Flex::column()
+            .cross_axis_alignment(CrossAxisAlignment::Start)
+            .with_child(Flex::row()
+                .with_child(Label::new(format!("Current Prospect: {}", data.characters[idx].location)))
+            ).with_default_spacer()
+            .with_child(Flex::row()
+                .with_child(Label::new("Abandoned"))
+                .with_default_spacer()
+                .with_child(Checkbox::new("")
+                    .disabled_if(|state: &bool, _ctx| !*state)
+                    .lens(character_lens.clone().then(Character::is_abandoned)))
+                .with_child(Button::new("Restore Character")
+                    .on_click(|_ctx, t: &mut Character, _env|{ t.restore().expect("Restoring character failed unexpectedly") })
+                    .disabled_if(|state: &Character, _ctx| !state.is_abandoned)
+                    .lens(character_lens.clone()))
+            ).with_default_spacer()
+            .with_child(Flex::row()
+                .with_child(Button::new("Reset Talents").on_click(|_ctx, t: &mut Character, _env| t.reset_talents()).lens(character_lens.clone()))
+            ).with_default_spacer()
+            .with_child(Flex::row()
+                .with_child(Button::new("Reset Blueprints").on_click(|_ctx, t: &mut Character, _env| t.reset_blueprints()).lens(character_lens.clone()))
+            ).with_default_spacer()
+            .with_child(Flex::row()
+                .with_child(Button::new("Save").on_click(|_ctx, t: &mut UiState, _env| t.save().expect("Error saving profile and/or character data") ))
+            )
+    }
+
     fn tab_label(&self, _: Self::Key, info: TabInfo<Self::Input>, _: &Self::Input) -> Self::LabelWidget {
         Self::default_make_label(info)
     }
 }
 
+#[cfg(feature = "full")]
 fn ui_builder() -> impl Widget<UiState> {
     let view_switcher = ViewSwitcher::new(
         |data: &UiState, _env| { if data.error.is_some() { MainView::Error } else { MainView::Data }},
@@ -518,6 +556,34 @@ fn ui_builder() -> impl Widget<UiState> {
                         .with_default_spacer()
                         .with_child(Flex::row()
                             .with_child(Button::new("Unlock All Workshop Items").on_click(|_ctx, t: &mut Profile, _env| t.unlock_all_workshop_items()).lens(UiState::profile_lens))
+                        )
+                        .with_default_spacer()
+                        .with_child(Flex::row()
+                            .with_child(Button::new("Save").on_click(|_ctx, t: &mut UiState, _env| t.save().expect("Error saving data")))
+                        )
+                        .with_default_spacer()
+                        .with_flex_child(tabs, 1.0);
+                    Align::centered(layout)
+                },
+                MainView::Error => Align::centered(Label::new(format!("Error occurred during startup: {}", data.error.as_ref().unwrap_or(&"Unknown Error".to_string())))),
+            })
+        }
+    );
+
+    view_switcher
+}
+
+#[cfg(feature = "minimal")]
+fn ui_builder() -> impl Widget<UiState> {
+    let view_switcher = ViewSwitcher::new(
+        |data: &UiState, _env| { if data.error.is_some() { MainView::Error } else { MainView::Data }},
+        |selector, data: &UiState, _env| {
+            Box::new(match selector {
+                MainView::Data => {
+                    let tabs = Tabs::for_policy(CharTabs{})/*.lens(UiState)*/;
+                    let layout = Flex::column()
+                        .with_child(Flex::row()
+                            .with_child(Button::new("Unlock All Prospects").on_click(|_ctx, t: &mut Profile, _env| t.unlock_all_prospects()).lens(UiState::profile_lens))
                         )
                         .with_default_spacer()
                         .with_child(Flex::row()
