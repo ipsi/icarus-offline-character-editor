@@ -2,6 +2,8 @@
 Basic GUI editor for *offline* characters for the game Icarus: First Cohort
 ([Steam Page](https://store.steampowered.com/app/1149460/ICARUS/))
 
+Some stuff
+
 ## Installation
 There are two versions of the program provided - one will allow you to restore dead/abandoned
 characters, unlock all prospects, and reset your Talents and Blueprints. The other provides a
