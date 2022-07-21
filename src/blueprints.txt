@@ -328,3 +328,6 @@ Masonry_Bench_T4,1.0
 Carpentry_Bench_T4,1.0
 Radar,1.0
 Extractor,1.0
+Deep_Mining_Drill_Biofuel,1.0
+Titanium_Hammer,1.0
+Deep_Mining_Drill_Electric,1.0

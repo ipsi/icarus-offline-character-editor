@@ -27,6 +27,7 @@ const WORKSHOP_ITEMS_RAW: &'static str = include_str!("workshop_items.txt");
 
 const META_RESOURCE_CREDITS: &'static str = "Credits";
 const META_RESOURCE_EXOTICS: &'static str = "Exotic1";
+const META_RESOURCE_RETRAINING_POINTS: &'static str = "Refund";
 
 const EXOTIC_MINING_FLAG: f64 = 17.0;
 const EXOTIC_EXTRACTION_FLAG: f64 = 18.0;
@@ -226,6 +227,29 @@ impl Lens<Vector<f64>, bool> for FlagLens {
             if !data.contains(&self.flag) { data.push_back(self.flag) };
         } else {
             data.retain(|x| *x != self.flag);
+        }
+
+        v
+    }
+}
+
+struct ProspectLens {
+    prospect: &'static str,
+}
+
+impl Lens<Vector<Talent>, bool> for ProspectLens {
+    fn with<V, F: FnOnce(&bool) -> V>(&self, data: &Vector<Talent>, f: F) -> V {
+        f(&data.contains(&Talent { row_name: self.prospect.into(), rank: 1.0 }))
+    }
+
+    fn with_mut<V, F: FnOnce(&mut bool) -> V>(&self, data: &mut Vector<Talent>, f: F) -> V {
+        let talent = Talent { row_name: self.prospect.into(), rank: 1.0 };
+        let mut flag = data.contains(&talent);
+        let v = f(&mut flag);
+        if flag {
+            if !data.contains(&talent) { data.push_back(talent) };
+        } else {
+            data.retain(|x| *x != talent);
         }
 
         v
@@ -544,11 +568,23 @@ fn ui_builder() -> impl Widget<UiState> {
                     let textbox_exotics = ValueTextBox::new(TextBox::new(), ParseFormatter::<f64>::new())
                         .fix_width(100.0)
                         .lens(UiState::profile_lens.then(Profile::meta_resources).then(MetaResourceLens { resource_name: META_RESOURCE_EXOTICS.to_string() }).then(MetaResources::count));
+                    let label_retraining_points = Label::<UiState>::new("Retraining Points: ");
+                    let textbox_retraining_points = ValueTextBox::new(TextBox::new(), ParseFormatter::<f64>::new())
+                        .fix_width(100.0)
+                        .lens(UiState::profile_lens.then(Profile::meta_resources).then(MetaResourceLens { resource_name: META_RESOURCE_RETRAINING_POINTS.to_string() }).then(MetaResources::count));
+                    let checkbox_exotic_miner_radar = Checkbox::new("Workshop Exotic Miner & Radar Unlocked")
+                        .lens(UiState::profile_lens.then(Profile::talents).then(ProspectLens { prospect: "Prospect_OLY_Arctic_Extraction" }));
+                    let checkbox_deep_ore_scanner = Checkbox::new("Workshop Deep Ore Vein Scanner Unlocked")
+                        .lens(UiState::profile_lens.then(Profile::talents).then(ProspectLens { prospect: "Prospect_OLY_Riverlands_Extraction" }));
                     let tabs = Tabs::for_policy(CharTabs{})/*.lens(UiState)*/;
                     let layout = Flex::column()
                         .with_child(Flex::row().with_child(label_credits).with_default_spacer().with_child(textbox_credits))
                         .with_default_spacer()
                         .with_child(Flex::row().with_child(label_exotics).with_default_spacer().with_child(textbox_exotics))
+                        .with_default_spacer()
+                        .with_child(Flex::row().with_child(label_retraining_points).with_default_spacer().with_child(textbox_retraining_points))
+                        .with_default_spacer()
+                        .with_child(Flex::row().with_child(checkbox_exotic_miner_radar).with_default_spacer().with_child(checkbox_deep_ore_scanner))
                         .with_default_spacer()
                         .with_child(Flex::row()
                             .with_child(Button::new("Unlock All Prospects").on_click(|_ctx, t: &mut Profile, _env| t.unlock_all_prospects()).lens(UiState::profile_lens))
@@ -602,7 +638,7 @@ fn ui_builder() -> impl Widget<UiState> {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let main_window = WindowDesc::new(ui_builder()).title("Icarus Offline Character Editor").window_size((440.0, 600.0));
+    let main_window = WindowDesc::new(ui_builder()).title("Icarus Offline Character Editor").window_size((750.0, 700.0));
     let data = UiState::new();
     match data {
         Ok(d) => AppLauncher::with_window(main_window)

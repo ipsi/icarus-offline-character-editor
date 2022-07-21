@@ -12,3 +12,13 @@ Prospect_OLY_Desert_Scan,1.0
 Prospect_OLY_Omni_Exploration,1.0
 Prospect_OLY_Canyon_Scan,1.0
 Prospect_OLY_Riverlands_Extermination_Hardcore,1.0
+Prospect_Styx_A_Expedition
+Prospect_Styx_B_Expedition
+Prospect_Styx_C_Expedition,1.0
+Prospect_Styx_D_Expedition,1.0
+Prospect_Styx_E_Expedition,1.0
+Prospect_Styx_A_Exploration,1.0
+Prospect_Styx_B_Exploration,1.0
+Prospect_Styx_C_Exploration,1.0
+Prospect_Styx_D_Exploration,1.0
+Prospect_Styx_E_Exploration,1.0
