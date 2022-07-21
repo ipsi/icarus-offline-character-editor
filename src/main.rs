@@ -638,7 +638,7 @@ fn ui_builder() -> impl Widget<UiState> {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let main_window = WindowDesc::new(ui_builder()).title("Icarus Offline Character Editor").window_size((750.0, 700.0));
+    let main_window = WindowDesc::new(ui_builder()).title("Icarus Offline Character Editor").window_size((750.0, 800.0));
     let data = UiState::new();
     match data {
         Ok(d) => AppLauncher::with_window(main_window)
