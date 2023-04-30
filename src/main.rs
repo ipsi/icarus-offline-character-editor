@@ -347,7 +347,17 @@ struct UiState {
 impl UiState {
     pub fn new() -> Result<UiState, Box<dyn Error>> {
         let dirs = BaseDirs::new().ok_or::<Box<dyn Error>>("Unable to find %APPDATA%\\Local\\".into())?;
-        let data_local_dir = dirs.data_local_dir().join("Icarus").join("Saved").join("Offline");
+        let data_local_dir = dirs.data_local_dir().join("Icarus").join("Saved").join("PlayerData");
+        let mut steam_ids = data_local_dir.read_dir()?.collect::<Vec<_>>();
+        let data_local_dir = if steam_ids.is_empty() {
+            return Err("Unable to find PlayerData folder".into());
+        } else {
+            if steam_ids.len() > 1 {
+                println!("Found {} Steam IDs - picking the first one in list", steam_ids.len())
+            }
+            steam_ids.remove(0)?.path()
+        };
+
         let profile_file = data_local_dir.join("Profile.json");
         let characters_file = data_local_dir.join("Characters.json");
 
@@ -638,7 +648,7 @@ fn ui_builder() -> impl Widget<UiState> {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let main_window = WindowDesc::new(ui_builder()).title("Icarus Offline Character Editor").window_size((750.0, 800.0));
+    let main_window = WindowDesc::new(ui_builder()).title("Icarus Offline Character Editor").window_size((750.0, 900.0));
     let data = UiState::new();
     match data {
         Ok(d) => AppLauncher::with_window(main_window)
